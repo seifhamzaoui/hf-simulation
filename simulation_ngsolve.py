@@ -77,6 +77,11 @@ MU0 = 4e-7 * np.pi
 
 # Physical properties for each named material now live in config.py's
 # MATERIALS dict (edit values there -- shared with the AEDT-based scripts).
+# CORE_AC is captured BEFORE the reduction below strips every non-"ngsolve"
+# sub-dict -- run_inductance()'s core_fill_factor_aware needs "ac"'s
+# "fill_factor", which "ngsolve" alone doesn't carry (mirrors
+# simulation_ngsolve_litz.py's own CORE_AC = CONFIG_MATERIALS["Core"]["ac"]).
+CORE_AC = MATERIALS["Core"]["ac"]
 # Here we only need the "ngsolve" numeric sub-dict per material.
 MATERIALS = {name: props["ngsolve"] for name, props in MATERIALS.items()}
 
@@ -698,7 +703,7 @@ def run_inductance(test_rings=None, order=1, pad=0.05,
     print(f"reg_factor={reg_factor:g}  ->  reg={reg:.4g}  (nu_core={1.0/(MU0*mu_r_core):.4g})")
 
     if core_fill_factor_aware:
-        core_fill_factor = MATERIALS["Core"]["ac"]["fill_factor"]
+        core_fill_factor = CORE_AC["fill_factor"]
         energy_weight = mesh.MaterialCF({"Core": core_fill_factor}, default=1.0)
     else:
         energy_weight = 1.0

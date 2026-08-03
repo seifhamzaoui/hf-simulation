@@ -690,7 +690,7 @@ def run_inductance_gpu(test_rings=None, entrefer_maxh=None, entrefer_solid_maxh=
     reg = reg_factor * (1.0 / sim.MU0) / Ldom ** 2
 
     if core_fill_factor_aware:
-        core_fill_factor = sim.MATERIALS["Core"]["ac"]["fill_factor"]
+        core_fill_factor = sim.CORE_AC["fill_factor"]
         energy_weight = mesh.MaterialCF({"Core": core_fill_factor}, default=1.0)
     else:
         energy_weight = 1.0
