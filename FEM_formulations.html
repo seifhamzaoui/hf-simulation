@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Finite Element Formulations Used in This Project</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  @media print {
+    body { font-size: 11pt; }
+    h1, h2, h3 { page-break-after: avoid; }
+    section { page-break-inside: avoid; }
+  }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    max-width: 850px;
+    margin: 2em auto;
+    padding: 0 1.5em;
+    line-height: 1.55;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 1.7em; border-bottom: 2px solid #333; padding-bottom: 0.3em; }
+  h2 { font-size: 1.3em; margin-top: 1.8em; border-bottom: 1px solid #999; padding-bottom: 0.2em; }
+  h3 { font-size: 1.1em; margin-top: 1.4em; }
+  code { background: #f2f2f2; padding: 0.1em 0.35em; border-radius: 3px; font-family: Consolas, monospace; font-size: 0.92em; }
+  hr { border: none; border-top: 1px solid #ccc; margin: 2em 0; }
+  .intro { font-style: italic; color: #444; }
+  a { color: #2255aa; text-decoration: none; }
+  .caveat { background: #fff8e6; border-left: 4px solid #e0a800; padding: 0.6em 1em; margin: 1em 0; }
+</style>
+</head>
+<body>
+
+<h1>Finite Element Formulations Used in This Project</h1>
+<p class="intro">This document collects the strong-form PDEs, the weak/finite-element forms actually implemented
+(<code>simulation_ngsolve.py</code>, <code>simulation_ngsolve_litz.py</code>), and the Litz-wire and core
+homogenization formulas used to turn a stranded/laminated winding into a solvable bulk material.</p>
+
+<hr>
+
+<section>
+<h2>1. Electrostatics — Capacitance (<code>run_capacitance</code>)</h2>
+
+<p><b>Strong form</b> (Laplace/Poisson equation for the electric scalar potential &phi;, no free charge):</p>
+$$\nabla\cdot(\varepsilon \nabla \varphi) = 0 \quad \text{in } \Omega$$
+<p>with Dirichlet conditions <code>&phi; = 1</code> on the driven conductor's surface, <code>&phi; = 0</code> on all
+other conductor surfaces (each conductor solved as its own driven case to build the full capacitance matrix), and
+$\varepsilon = \varepsilon_0 \varepsilon_r$ piecewise-constant per material (from <code>config.py</code>'s
+<code>MATERIALS[...]["ngsolve"]["eps_r"]</code>).</p>
+
+<p><b>Weak form</b> (H&sup1; Galerkin, code: <code>simulation_ngsolve.py:309</code>):</p>
+$$\int_\Omega \varepsilon\, \nabla u \cdot \nabla v \, dV = 0 \qquad \forall v \in H^1_0(\Omega)$$
+<p>Capacitance is extracted from the stored electrostatic energy of the solved field, then reduced (Core folded
+into the diagonal) to match Q3D's reported convention.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>2. DC Conduction — DC Resistance (<code>run_dc_resistance</code>)</h2>
+
+<p><b>Strong form</b> (steady-state current conservation, no volumetric source):</p>
+$$\nabla\cdot(\sigma \nabla \varphi) = 0 \quad \text{in } \Omega_\text{ring}$$
+<p>solved <b>per ring independently</b> (each ring's own solid, not the full assembly), with Dirichlet
+<code>&phi;=1</code> on the <code>_hi</code> terminal face, <code>&phi;=0</code> on the <code>_gnd</code> terminal
+face.</p>
+
+<p><b>Weak form</b> (<code>simulation_ngsolve.py:408</code>):</p>
+$$\int_{\Omega_\text{ring}} \sigma_\text{eff}\, \nabla u \cdot \nabla v \, dV = 0$$
+
+<p>Resistance from the dissipated power identity:</p>
+$$R = \frac{V^2}{P}, \qquad P = \int_{\Omega_\text{ring}} \sigma_\text{eff}\, |\nabla \varphi|^2 \, dV, \quad V = 1\text{ V}$$
+
+<p>$\sigma_\text{eff}$ is either the bulk copper conductivity $\sigma_\text{Cu}$ (solid-conductor assumption,
+validated against Q3D to &lt;0.2%), or $\sigma_\text{Cu} \cdot \text{fill\_factor}$ when
+<code>config.DC_RESISTANCE_LITZ_AWARE = True</code> — see §4.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>3. DC Magnetostatics — Self/Mutual Inductance (<code>run_inductance</code>)</h2>
+
+<p><b>Strong form</b> (Ampère's law, magnetoquasistatic, in terms of the magnetic vector potential
+<b>A</b>, $\mathbf B = \nabla\times\mathbf A$):</p>
+$$\nabla\times\!\big(\nu \,\nabla\times \mathbf A\big) = \mathbf J \quad \text{in } \Omega, \qquad \mathbf A = 0 \text{ on } \partial\Omega_\text{outer}$$
+<p>with $\nu = 1/(\mu_0\mu_r)$ piecewise-constant (Core: $\mu_r\approx 30000$; windings, entrefer, air: $\mu_r=1$),
+and $\mathbf J$ the ring's own current density (built by a separate closed-loop, EMF-driven DC-conduction "battery"
+sub-solve, normalized to exactly 1 A — see <code>_solve_ring_current</code>).</p>
+
+<p><b>Weak form</b>, H(curl) Galerkin, with a small Tikhonov-style regularization to remove the curl-curl operator's
+null space (gradient fields) (<code>simulation_ngsolve.py:645</code>):</p>
+$$\int_\Omega \nu\, (\nabla\times \mathbf u)\cdot(\nabla\times \mathbf v)\, dV \;+\; \text{reg}\!\int_\Omega \mathbf u\cdot \mathbf v\, dV \;=\; \int_\Omega \mathbf J \cdot \mathbf v\, dV$$
+
+<p>Self/mutual inductance from the standard energy identity, for unit-normalized currents:</p>
+$$L_{ij} = \int_\Omega \mathbf A_i \cdot \mathbf J_j \, dV$$
+
+<p>(This is mathematically the discrete form of $L_{ij} = \Psi_i/I_j$, and was cross-validated this session
+against an independent flux calculation, $L = \Phi/I$ through a cut plane, to ~1%.)</p>
+</section>
+
+<hr>
+
+<section>
+<h2>4. Frequency-Domain (Litz) Sweep — AC Inductance &amp; Resistance
+(<code>simulation_ngsolve_litz.run_litz_sweep</code>)</h2>
+
+<p><b>Strong form</b> — same Ampère's-law PDE as §3, but $\nu$ is now <b>complex</b> and
+<b>frequency-dependent</b> in the winding and core regions, while $\mathbf J$ stays the same real,
+frequency-independent 1 A current distribution (valid because Litz wire is designed to keep each strand's own
+current uniform well past the frequencies of interest):</p>
+$$\nabla\times\!\big(\nu(\omega) \,\nabla\times \mathbf A(\omega)\big) = \mathbf J \quad \text{in } \Omega$$
+$$\nu(\omega) = \frac{1}{\mu_0\,\mu_\text{complex}(\omega)}$$
+
+<p><b>Weak form</b> — identical structure to §3 but over a <b>complex</b> H(curl) space:</p>
+$$\int_\Omega \nu(\omega)\, (\nabla\times \mathbf u)\cdot(\nabla\times \mathbf v)\, dV \;+\; \text{reg}\!\int_\Omega \mathbf u\cdot \mathbf v\, dV \;=\; \int_\Omega \mathbf J \cdot \mathbf v\, dV, \qquad \mathbf u,\mathbf v \in H(\mathrm{curl};\mathbb C)$$
+
+<p><b>Extraction</b>, for unit currents:</p>
+$$L_\text{complex}(\omega) = \int_\Omega \mathbf A(\omega)\cdot \mathbf J \, dV = L'(\omega) - jL''(\omega)$$
+$$L(\omega) = \operatorname{Re}\big(L_\text{complex}\big), \qquad R_\text{ac,added}(\omega) = -\,\omega\,\operatorname{Im}\big(L_\text{complex}\big)$$
+
+<p>(The minus sign was fixed <b>empirically</b> this session — the naive <code>+&omega;&middot;Im(L_complex)</code>
+gave a negative, unphysical added resistance at 1&nbsp;MHz; the sign above was confirmed to give
+<code>Rac &ge; 0</code> at every tested frequency.)</p>
+
+<h3>4.1 Litz-wire winding model — complex permeability (Bessel formula)</h3>
+
+<p>Each winding (<code>ringp</code>/<code>rings</code>) is a bundle of many thin, individually-insulated round
+strands. Rather than meshing every strand, the bundle is homogenized into one bulk region whose complex
+permeability reproduces each strand's own 1-D radial skin effect exactly (classical result, time convention
+$e^{+j\omega t}$):</p>
+$$k = \frac{1-j}{\delta}, \qquad \delta = \sqrt{\frac{2}{\omega\,\mu_0\,\mu_r\,\sigma}} \quad\text{(skin depth)}$$
+$$\mu_\text{complex}(\omega) = \mu_r \cdot \frac{2}{ka}\cdot\frac{J_1(ka)}{J_0(ka)}$$
+
+<p>where $a$ = strand radius (<code>strand_diameter_m / 2</code>), $\sigma$ = copper conductivity, and
+$J_0, J_1$ are Bessel functions of the first kind. Implemented in <code>complex_mu_litz()</code>. As
+$\omega\to 0$, $\mu_\text{complex}\to\mu_r$ (real, lossless) — verified by <code>_selftest_complex_mu()</code>.</p>
+
+<p><b>Scope/limitation</b>: this captures each strand's own skin effect only. It does <b>not</b> model
+strand-to-strand <i>proximity</i> effect (the extra loss a strand picks up from its neighbors' field) — a real,
+documented gap, confirmed this session by comparing against FEMM's reference values
+(<code>femm/R_Ratio.mat</code>), which diverge increasingly from this model at higher frequency.</p>
+
+<h3>4.2 Core model — complex permeability (lamination formula)</h3>
+
+<p>The core is a single solid (or laminated) ferrite block, not a stranded bundle, so it gets a <b>different</b>
+closed form — the classical 1-D skin effect solution for a <b>slab</b> of thickness $d$, instead of a round
+wire:</p>
+$$\mu_\text{complex}(\omega) = \mu_r \cdot \frac{\tanh(kd/2)}{kd/2}, \qquad k = \frac{1-j}{\delta}$$
+
+<p>Implemented in <code>complex_mu_lamination()</code>, using <code>config.py</code>'s
+<code>MATERIALS["Core"]["ac"]</code> (<code>sigma_ac</code>, <code>lamination_thickness_m</code>,
+<code>mu_r</code>).</p>
+
+<p><b>Stacking (fill) factor correction</b>: a real lamination stack is only partially magnetic material (the
+rest is inter-lamination insulation). The stacking factor $f$
+(<code>MATERIALS["Core"]["ac"]["fill_factor"]</code>) dilutes the raw formula:</p>
+$$\mu_\text{eff}(\omega) = 1 + f\,\big(\mu_\text{complex}(\omega) - 1\big)$$
+
+<p>Implemented in <code>core_mu_effective()</code> — this is the function actually used in the sweep, not the
+raw <code>complex_mu_lamination()</code> output.</p>
+
+<div class="caveat"><b>Important caveat found this session</b>: because most of a gapped transformer's total
+inductance is stored in the core, even the core's <i>small</i> loss tangent
+($\operatorname{Im}(\mu)/\operatorname{Re}(\mu)$) can dominate the total <code>Rac</code>, more than the
+windings' own Litz skin effect does. The core's <code>sigma_ac</code>/<code>lamination_thickness_m</code>/<code>fill_factor</code>
+are currently <b>placeholder values</b> — the computed AC/DC ratios are more sensitive to these unvalidated core
+parameters right now than to the actual wire spec.</div>
+</section>
+
+<hr>
+
+<section>
+<h2>5. AC/DC Ratio Sweep (<code>simulation_ngsolve_litz_ratio.run_ratio_sweep</code>)</h2>
+
+<p>Not a new PDE — reuses §4's formulation on a small, dynamically-chosen representative sample (3 turns near
+the middle of each winding, solved <b>in isolation</b> per winding, not combined, to avoid mutual-coupling
+contamination between primary and secondary). For each winding:</p>
+$$\text{ratio}_L(\omega) = \frac{L_\text{series}(\omega)}{L_\text{series}(0)}, \qquad
+\text{ratio}_R(\omega) = \frac{R_\text{dc} + R_\text{ac,added}(\omega)}{R_\text{dc}}$$
+
+<p>where $L_\text{series}$ is the full sum of the 3×3 self+mutual submatrix (turns in series), and $R_\text{dc}$
+comes from the Ohmic identity $R = \int J^2/\sigma_\text{eff}\, dV$ applied to the same normalized current field
+already built for the AC solve. These scalar ratios are then broadcast onto every turn of that winding (diagonal
+matrix per frequency, same convention as <code>femm/R_Ratio.mat</code> / <code>L_Ratio.mat</code>) and used to
+scale the full DC reference matrices (<code>DCR.mat</code>, <code>induc.mat</code>) into AC-corrected ones —
+avoiding a full 60-turn resolve at every frequency.</p>
+</section>
+
+</body>
+</html>

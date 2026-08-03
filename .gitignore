@@ -1,0 +1,17 @@
+# Python virtual environment (already self-excluded via its own
+# .venv/.gitignore, listed here too for robustness if recreated differently)
+.venv/
+
+# Bytecode cache
+__pycache__/
+*.pyc
+
+# .exe packaging build output/artifacts (see build_exe/build_portable.ps1
+# to reproduce) -- the build SCRIPTS themselves (launcher_stub.py,
+# build_portable.ps1) are still tracked, just not their output.
+dist/
+build_exe/pyinstaller_work/
+build_exe/build_log*.txt
+
+# Stray editor/backup files
+config.py.bak

@@ -1,0 +1,7 @@
+netgen
+ngsolve
+numpy
+scipy
+pyaedt
+pandas
+ezdxf
