@@ -12,6 +12,6 @@ __pycache__/
 dist/
 build_exe/pyinstaller_work/
 build_exe/build_log*.txt
-
+ngsolve matrices/
 # Stray editor/backup files
 config.py.bak
