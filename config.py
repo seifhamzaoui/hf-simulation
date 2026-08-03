@@ -1,6 +1,6 @@
 # ----- CORE -----
 col_width  = 70     # column width (x)
-col_depth  = 65     # stacking depth (z)
+col_depth  = 60     # stacking depth (z)
 
 bobine_spacing = 10 # distance between inner faces of columns
 # ----- MANDREL -----
