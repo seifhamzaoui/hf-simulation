@@ -68,8 +68,8 @@ DC_RESISTANCE_LITZ_AWARE = True
 # each can be tuned independently. Pass primary_count=/secondary_count=
 # to run_ratio_sweep() to override either for one call without editing
 # this file -- see that function's own docstring.
-LITZ_RATIO_SAMPLE_COUNT_PRIMARY = 16
-LITZ_RATIO_SAMPLE_COUNT_SECONDARY = 40
+LITZ_RATIO_SAMPLE_COUNT_PRIMARY = 1
+LITZ_RATIO_SAMPLE_COUNT_SECONDARY = 1
 
 # Simulation parameters
 
