@@ -289,7 +289,7 @@ def solve_system_spectrum(frequencies, vg_list, C_K, K, C_H, H, R,L,G_K=None,G_H
         L_ratio = Inductance_ratio[f'f_{int(extracted_freq/1000)}kHz']
         # R = np.array(R)
         # R[:N1] *= calculate_Fr(ds = 0.012,f = freq,sigma = 59e6,mu_r = 1)
-
+        L_ratio = 1
         # # 2. Multiply rows FROM N2 to the end (includes row N2)
         # R[N1+1:] *= calculate_Fr(ds = 0.007,f = freq,sigma = 59e6,mu_r = 1)
         # calculate_Fr(ds = 0.007,f = freq,sigma = 59e6,mu_r = 1)*

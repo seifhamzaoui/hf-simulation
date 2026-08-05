@@ -177,7 +177,7 @@ MATERIALS = {
         #                           the standard stacking-factor
         #                           homogenization (insulation layers
         #                           themselves contribute mu_r=1).
-        "ac": {"sigma_ac": 8e5, "lamination_thickness_m": 2e-5, "mu_r": 30000.0, "fill_factor": 0.75},
+        "ac": {"sigma_ac": 8e5, "lamination_thickness_m": 2e-5, "mu_r": 30000.0, "fill_factor": 0.56},
     },
     "pinsulator": {
         "pattern": "pinsulator.*",
