@@ -200,13 +200,14 @@ def run_litz_sweep(test_rings=None, frequencies_hz=None, order=1, pad=0.05,
     lamination formula with no fill_factor dilution) stays exactly what
     the curl-curl solve sees, so the field solution is unaffected by
     fill_factor. Instead, config.py's MATERIALS["Core"]["ac"]["fill_factor"]
-    is applied as a POST-SOLVE weight when extracting L_H/Rac_ohm: only
-    the Core's own contribution to
-    integral(nu*curl(A_i).curl(A_j)) gets multiplied by fill_factor --
-    entrefer/windings/air all keep weight 1.0 -- since only that fraction
-    of the core's geometric cross-section is actually magnetic (lossy) material, the
-    rest being inter-lamination insulation contributing ~zero stored
-    energy/loss. Mirrors simulation_ngsolve.run_inductance()'s same flag.
+    is applied as a POST-SOLVE weight when extracting L_H (only -- see
+    Rac_ohm's own unweighted extraction below): the Core's AND entrefer's
+    contribution to integral(nu*curl(A_i).curl(A_j)) both get multiplied
+    by fill_factor -- windings/air keep weight 1.0 -- since only that
+    fraction of the core's (and its gap's) geometric cross-section is
+    actually magnetic (lossy) material, the rest being inter-lamination
+    insulation contributing ~zero stored energy/loss. Mirrors
+    simulation_ngsolve.run_inductance()'s same flag.
     Pass False for the old unweighted integral(A_i.J_j) extraction
     (equivalent to fill_factor=1.0)."""
     if frequencies_hz is None:
@@ -312,7 +313,7 @@ def run_litz_sweep(test_rings=None, frequencies_hz=None, order=1, pad=0.05,
 
         if core_fill_factor_aware:
             core_fill_factor = CORE_AC["fill_factor"]
-            energy_weight = mesh.MaterialCF({"Core": core_fill_factor}, default=1.0)
+            energy_weight = mesh.MaterialCF({"Core": core_fill_factor, "entrefer": core_fill_factor}, default=1.0)
         else:
             energy_weight = 1.0
 

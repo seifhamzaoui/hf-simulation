@@ -233,8 +233,8 @@ def _solve_combined(mesh, Ldom, J_primary_bundle, J_secondary_bundle, I_primary,
     outside the conductors, so it can't "see" the core at all -- weighting
     requires the field-energy form, evaluated over the whole mesh).
     core_fill_factor_aware=True (default): config.py's
-    MATERIALS["Core"]["ac"]["fill_factor"] multiplies ONLY the Core's own
-    share of that energy integral (entrefer/windings/air all stay weight
+    MATERIALS["Core"]["ac"]["fill_factor"] multiplies the Core's AND
+    entrefer's share of that energy integral (windings/air stay weight
     1.0) when computing L_primary/L_secondary -- mirrors
     simulation_ngsolve.run_inductance()'s same flag. mu_r itself is left
     exactly as core_mu_effective()/complex_mu_litz() already compute it
@@ -297,7 +297,7 @@ def _solve_combined(mesh, Ldom, J_primary_bundle, J_secondary_bundle, I_primary,
         core_fill_factor = lz.CORE_AC["fill_factor"]
         fill_val = complex(core_fill_factor, 0.0) if is_complex else core_fill_factor
         default_weight = complex(1.0, 0.0) if is_complex else 1.0
-        energy_weight = mesh.MaterialCF({"Core": fill_val}, default=default_weight)
+        energy_weight = mesh.MaterialCF({"Core": fill_val, "entrefer": fill_val}, default=default_weight)
     else:
         energy_weight = complex(1.0, 0.0) if is_complex else 1.0
 

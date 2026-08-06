@@ -617,11 +617,11 @@ def run_inductance(test_rings=None, order=1, pad=0.05,
     the actual curl-curl solve, so the field solution itself is unaffected
     by fill_factor. Instead, the lamination stacking factor (config.py's
     MATERIALS["Core"]["ac"]["fill_factor"]) is applied as a POST-SOLVE
-    weight when extracting L: only the Core's own contribution to
+    weight when extracting L: the Core's AND entrefer's contribution to
     integral(nu*curl(A_i).curl(A_j)) (the stored-energy form of the
-    inductance integral) gets multiplied by fill_factor -- entrefer,
-    windings, and air all keep weight 1.0 -- reflecting that only a
-    fill_factor fraction of the core's geometric cross-section is
+    inductance integral) both get multiplied by fill_factor -- windings
+    and air keep weight 1.0 -- reflecting that only a fill_factor
+    fraction of the core's (and its gap's) geometric cross-section is
     actually magnetic material (the rest is inter-lamination insulation
     contributing ~zero stored energy), without perturbing how flux
     actually distributes through the solved field. Mirrors
@@ -704,7 +704,7 @@ def run_inductance(test_rings=None, order=1, pad=0.05,
 
     if core_fill_factor_aware:
         core_fill_factor = CORE_AC["fill_factor"]
-        energy_weight = mesh.MaterialCF({"Core": core_fill_factor}, default=1.0)
+        energy_weight = mesh.MaterialCF({"Core": core_fill_factor, "entrefer": core_fill_factor}, default=1.0)
     else:
         energy_weight = 1.0
 
@@ -728,7 +728,7 @@ def run_inductance(test_rings=None, order=1, pad=0.05,
         print(f"  {k + 1}/{N} {name}: field solved")
 
     print("Assembling inductance matrix (L_ij = integral(nu*curl(A_i).curl(A_j)*energy_weight), "
-          "fill_factor-weighted in Core+entrefer only)...")
+          "fill_factor-weighted in Core+entrefer)...")
     L = np.zeros((N, N))
     gfAi = GridFunction(fes_h)
     gfAj = GridFunction(fes_h)
